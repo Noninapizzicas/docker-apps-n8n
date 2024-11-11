@@ -1,7 +1,4 @@
- De acuerdo, te paso los dos archivos completos con los cambios:
 
-1. **tasks-app/server.js**:
-```javascript
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
@@ -169,4 +166,3 @@ http.listen(PORT, () => {
 });
 ```
 
-¿Quieres que te pase ahora el index.html actualizado?
