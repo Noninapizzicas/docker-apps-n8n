@@ -1,3 +1,4 @@
+# Configuraciones existentes se mantienen igual
 reinaldo.n8nonina.es {
     reverse_proxy n8n:5678 {
         flush_interval -1
@@ -7,5 +8,15 @@ reinaldo.n8nonina.es {
 tareas.n8nonina.es {
     reverse_proxy tasks:3000 {
         flush_interval -1
+    }
+}
+
+# Nueva configuración para Nextcloud
+gertru.n8nonina.es {
+    reverse_proxy nextcloud:80 {
+        header_up Host {http.request.host}
+        header_up X-Real-IP {http.request.remote}
+        header_up X-Forwarded-For {http.request.remote}
+        header_up X-Forwarded-Proto {http.request.scheme}
     }
 }
