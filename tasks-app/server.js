@@ -1,3 +1,7 @@
+ De acuerdo, te paso los dos archivos completos con los cambios:
+
+1. **tasks-app/server.js**:
+```javascript
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
@@ -93,15 +97,22 @@ io.on('connection', (socket) => {
 
     // Actualizar estado de tarea
     socket.on('task-update', (update) => {
+        const { taskId, completed } = update;
+        let taskFound = false;
+        
         boardData.columns.forEach(column => {
             column.tasks.forEach(task => {
-                if (task.id === update.taskId) {
-                    task.completed = update.completed;
+                if (task.id === taskId) {
+                    task.completed = completed;
+                    taskFound = true;
                 }
             });
         });
-        saveData();
-        socket.broadcast.emit('task-updated', update);
+
+        if (taskFound) {
+            saveData();
+            socket.broadcast.emit('task-updated', update);
+        }
     });
     
     // Mover tarea entre columnas
@@ -156,3 +167,6 @@ const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log(`Servidor ejecutándose en puerto ${PORT}`);
 });
+```
+
+¿Quieres que te pase ahora el index.html actualizado?
