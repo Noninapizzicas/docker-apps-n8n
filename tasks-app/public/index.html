@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -167,8 +168,8 @@
     <div class="board" id="board"></div>
     <div id="statusMessage" class="status-message"></div>
 
-
-  <script>
+ 
+    <script>
         const socket = io();
         let data = null;
         let nextTaskId = 1;
@@ -323,7 +324,6 @@
             });
         }
 
-        // Funciones de edición de columnas y tareas
         function startEditingColumnTitle(titleEl, columnIndex) {
             const currentTitle = titleEl.textContent;
             const input = document.createElement('input');
@@ -398,7 +398,6 @@
             input.remove();
         }
 
-        // Funciones de gestión de tareas
         function updateTaskText(taskId, newText, emit = true) {
             data.columns.forEach(column => {
                 column.tasks.forEach(task => {
@@ -425,7 +424,6 @@
             renderBoard();
         }
 
-        // Funciones para drag and drop
         let draggedTask = null;
         let sourceColumn = null;
 
@@ -494,3 +492,4 @@
     </script>
 </body>
 </html>
+
