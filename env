@@ -1,0 +1,10 @@
+cat <<EOT > env
+DOMAIN_NAME=n8nonina.es
+SUBDOMAIN=reinaldo
+TASKS_SUBDOMAIN=tareas
+GENERIC_TIMEZONE=Europe/Madrid
+SSL_EMAIL=noninapizzicas@gmail.com
+POSTGRES_DB=n8nonina
+POSTGRES_USER=paco
+POSTGRES_PASSWORD=631282
+EOT
