@@ -475,24 +475,21 @@
             }
         }
 
-        function toggleTask(taskId) {
+function toggleTask(taskId) {
     let completed = false;
     data.columns.forEach(column => {
         column.tasks.forEach(task => {
             if (task.id === taskId) {
                 task.completed = !task.completed;
                 completed = task.completed;
+                // Emitir el cambio inmediatamente
+                socket.emit('task-update', { taskId, completed });
             }
         });
     });
-    
-    // Emitir el cambio
-    socket.emit('task-update', { taskId, completed });
-    // No renderizar aquí, esperar la confirmación del servidor
 }
 
 socket.on('task-updated', (update) => {
-    // Actualizar el estado localmente
     data.columns.forEach(column => {
         column.tasks.forEach(task => {
             if (task.id === update.taskId) {
