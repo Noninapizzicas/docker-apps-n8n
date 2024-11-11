@@ -1,0 +1,11 @@
+reinaldo.n8nonina.es {
+    reverse_proxy n8n:5678 {
+        flush_interval -1
+    }
+}
+
+tareas.n8nonina.es {
+    reverse_proxy tasks:3000 {
+        flush_interval -1
+    }
+}
