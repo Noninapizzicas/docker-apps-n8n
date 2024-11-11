@@ -482,23 +482,36 @@ function toggleTask(taskId) {
             if (task.id === taskId) {
                 task.completed = !task.completed;
                 completed = task.completed;
-                // Emitir el cambio inmediatamente
-                socket.emit('task-update', { taskId, completed });
             }
         });
     });
+    
+    // Emitir el cambio y renderizar después
+    socket.emit('task-update', { 
+        taskId: taskId, 
+        completed: completed 
+    });
+    renderBoard();
+    showStatus('Estado actualizado');
 }
 
+// Escuchar actualizaciones de otros clientes
 socket.on('task-updated', (update) => {
+    console.log('Recibida actualización:', update); // Para debug
+    let updated = false;
     data.columns.forEach(column => {
         column.tasks.forEach(task => {
             if (task.id === update.taskId) {
                 task.completed = update.completed;
+                updated = true;
             }
         });
     });
-    renderBoard();
-    showStatus('Tarea actualizada');
+    
+    if (updated) {
+        renderBoard();
+        showStatus('Tarea actualizada por otro usuario');
+    }
 });
     </script>
 </body>
