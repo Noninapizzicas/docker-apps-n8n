@@ -1,70 +1,197 @@
+version: '3.8'
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   n8n:
-    image: docker.n8n.io/n8nio/n8n
-    restart: always
-    ports:
-      - 5678:5678
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
     environment:
+      # Configuración básica
       - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
       - NODE_ENV=production
       - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=Europe/Madrid
+      # Configuración de base de datos
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      # Seguridad
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      # Redis para caché
+      - N8N_CACHE_ENABLED=true
+      - N8N_CACHE_REDIS_HOST=redis
+      - N8N_CACHE_REDIS_PORT=6379
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./local_files:/files
+      - ./local_files:/files:ro
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - n8n-network
+    depends_on:
+      - postgres
+      - redis
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
 
   postgres:
-    image: postgres:13
-    restart: always
+    image: postgres:13-alpine
+    restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/backup:/backup
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - n8n-network
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - n8n-network
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
 
   tasks:
     build: 
       context: ./tasks-app
-    restart: always
+      args:
+        NODE_ENV: production
+    restart: unless-stopped
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # Redis para sesiones y caché
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
-      - ./tasks-app/public:/app/public
+      - ./tasks-app/public:/app/public:ro
       - ./tasks-app/data:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - n8n-network
+    depends_on:
+      - redis
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
 
   caddy:
-    image: caddy:latest
+    image: caddy:2.7-alpine
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
+      - "443:443/udp"
+    environment:
+      - CADDY_ACME_AGREE=true
     volumes:
       - caddy_data:/data
-      - ./caddy_config:/config
-      - ./caddy_config/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_config:/config
+      - ./caddy_config/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /etc/localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
       - n8n-network
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
+    cap_add:
+      - NET_ADMIN
+    cap_drop:
+      - ALL
+
+  backup:
+    image: offen/docker-volume-backup:latest
+    restart: unless-stopped
+    environment:
+      - BACKUP_CRON_EXPRESSION="0 3 * * *"  # Diario a las 3 AM
+      - BACKUP_FILENAME=backup-%Y-%m-%d.tar.gz
+      - BACKUP_RETENTION_DAYS=7
+    volumes:
+      - n8n_data:/backup/n8n_data:ro
+      - postgres_data:/backup/postgres_data:ro
+      - redis_data:/backup/redis_data:ro
+      - caddy_data:/backup/caddy_data:ro
+      - ./backups:/archive
+    networks:
+      - n8n-network
+    logging: *default-logging
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   n8n-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: n8n-net
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
 
 volumes:
-  caddy_data:
   n8n_data:
+    driver: local
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
