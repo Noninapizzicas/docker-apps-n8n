@@ -1,17 +1,62 @@
-# Configuraciones existentes se mantienen igual
+# Configuración global
+{
+    noninapizzicas@gmail.com # Para certificados SSL
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+# N8N
 reinaldo.n8nonina.es {
     reverse_proxy n8n:5678 {
         flush_interval -1
+        header_up Host {http.request.host}
+        header_up X-Real-IP {http.request.remote}
+        header_up X-Forwarded-For {http.request.remote}
+        header_up X-Forwarded-Proto {http.request.scheme}
     }
+    
+    header {
+        # Seguridad básica
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-XSS-Protection "1; mode=block"
+        
+        # Eliminar headers innecesarios
+        -Server
+        -X-Powered-By
+    }
+
+    # Compresión para mejor rendimiento
+    encode zstd gzip
 }
 
+# Tareas
 tareas.n8nonina.es {
     reverse_proxy tasks:3000 {
         flush_interval -1
+        header_up Host {http.request.host}
+        header_up X-Real-IP {http.request.remote}
+        header_up X-Forwarded-For {http.request.remote}
+        header_up X-Forwarded-Proto {http.request.scheme}
     }
+    
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-XSS-Protection "1; mode=block"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
 }
 
-# Nueva configuración para Nextcloud
+# Nextcloud
 gertru.n8nonina.es {
     reverse_proxy nextcloud:80 {
         header_up Host {http.request.host}
@@ -19,4 +64,31 @@ gertru.n8nonina.es {
         header_up X-Forwarded-For {http.request.remote}
         header_up X-Forwarded-Proto {http.request.scheme}
     }
+
+    # Configuraciones específicas para Nextcloud
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"  # Nextcloud necesita esto para funcionar
+        Referrer-Policy "strict-origin-when-cross-origin"
+        X-XSS-Protection "1; mode=block"
+        -Server
+        -X-Powered-By
+    }
+
+    # Optimizaciones para Nextcloud
+    encode zstd gzip
+    
+    # Caché para archivos estáticos
+    @static {
+        file
+        path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.svg *.woff *.woff2
+    }
+    header @static Cache-Control "public, max-age=31536000"
 }
+
+# Monitoring de estado
+health.n8nonina.es {
+    respond /health 200
+}
+
